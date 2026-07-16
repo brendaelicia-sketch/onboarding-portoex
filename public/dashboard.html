@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard de Inconsistências</title>
+<link rel="stylesheet" href="css/styles.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">📋 Portal de Onboarding</div>
+  <nav>
+    <a href="index.html">Início</a>
+    <a href="onboarding.html">Novo Onboarding</a>
+    <a href="relatorios.html">Relatório Mensal</a>
+    <a href="inconsistencias.html">Inconsistências</a>
+    <a href="dashboard.html">Dashboard</a>
+  </nav>
+</div>
+
+<div class="container">
+  <h1>Dashboard de Inconsistências</h1>
+  <p class="subtitle">Visão geral de quais setores mais acionam a equipe e o impacto das ocorrências.</p>
+
+  <div class="filters">
+    <div class="field">
+      <label for="filterMonth">Período</label>
+      <select id="filterMonth"></select>
+    </div>
+  </div>
+
+  <div class="grid cols-3">
+    <div class="card kpi">
+      <div class="value" id="kpi-total">-</div>
+      <div class="label">Inconsistências no período</div>
+    </div>
+    <div class="card kpi">
+      <div class="value" id="kpi-nc">-</div>
+      <div class="label">Com não conformidade criada</div>
+    </div>
+    <div class="card kpi">
+      <div class="value" id="kpi-atend">-</div>
+      <div class="label">Precisaram de atendimento</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h2>Setor que mais aciona</h2>
+      <div class="chart-wrap"><canvas id="chartSetor"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Não conformidade x Atendimento</h2>
+      <div class="chart-wrap"><canvas id="chartComposicao"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Top setor do período</h2>
+    <div id="topSetorWrap" class="loading">Carregando...</div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+let allRecords = [];
+let chartSetor, chartComposicao;
+
+function populateMonths(records) {
+  const select = document.getElementById("filterMonth");
+  const months = new Set(records.map((r) => (r.data || "").slice(0, 7)).filter(Boolean));
+  months.add(currentMonthValue());
+  const sorted = [...months].sort().reverse();
+  select.innerHTML = '<option value="all">Todos os períodos</option>' + sorted.map((m) => `<option value="${m}">${monthLabel(m)}</option>`).join("");
+  select.value = currentMonthValue();
+}
+
+function render() {
+  const monthValue = document.getElementById("filterMonth").value;
+  const filtered = monthValue === "all" ? allRecords : allRecords.filter((r) => isInMonth(r.data, monthValue));
+
+  document.getElementById("kpi-total").textContent = filtered.length;
+  document.getElementById("kpi-nc").textContent = filtered.filter((r) => r.naoConformidadeCriada === "Sim").length;
+  document.getElementById("kpi-atend").textContent = filtered.filter((r) => r.atendimentoResolveu === "Sim").length;
+
+  const bySetor = {};
+  filtered.forEach((r) => { bySetor[r.setorCausador] = (bySetor[r.setorCausador] || 0) + 1; });
+  const setorEntries = Object.entries(bySetor).sort((a, b) => b[1] - a[1]);
+
+  const ctx1 = document.getElementById("chartSetor").getContext("2d");
+  if (chartSetor) chartSetor.destroy();
+  chartSetor = new Chart(ctx1, {
+    type: "bar",
+    data: {
+      labels: setorEntries.map((e) => e[0]),
+      datasets: [{
+        label: "Ocorrências",
+        data: setorEntries.map((e) => e[1]),
+        backgroundColor: "#1d4ed8",
+        borderRadius: 6,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+
+  const nc = filtered.filter((r) => r.naoConformidadeCriada === "Sim").length;
+  const semNc = filtered.length - nc;
+  const atend = filtered.filter((r) => r.atendimentoResolveu === "Sim").length;
+  const semAtend = filtered.length - atend;
+
+  const ctx2 = document.getElementById("chartComposicao").getContext("2d");
+  if (chartComposicao) chartComposicao.destroy();
+  chartComposicao = new Chart(ctx2, {
+    type: "doughnut",
+    data: {
+      labels: ["Não conformidade", "Sem não conformidade", "Atendimento acionado", "Sem atendimento"],
+      datasets: [{
+        data: [nc, semNc, atend, semAtend],
+        backgroundColor: ["#dc2626", "#dcfce7".replace("#dcfce7","#93c5fd"), "#d97706", "#a7f3d0"],
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+    },
+  });
+
+  const topWrap = document.getElementById("topSetorWrap");
+  if (setorEntries.length === 0) {
+    topWrap.innerHTML = '<p class="empty-state">Nenhuma inconsistência registrada neste período.</p>';
+  } else {
+    const [topName, topCount] = setorEntries[0];
+    const pct = filtered.length ? ((topCount / filtered.length) * 100).toFixed(0) : 0;
+    topWrap.innerHTML = `<p style="font-size:15px;">O setor <strong>${escapeHtml(topName)}</strong> foi responsável por <strong>${topCount}</strong> de ${filtered.length} inconsistências (${pct}%) no período selecionado.</p>`;
+  }
+}
+
+async function load() {
+  try {
+    allRecords = await apiGet("/api/inconsistencias");
+  } catch (e) {
+    showToast(e.message, "error");
+    allRecords = [];
+  }
+  populateMonths(allRecords);
+  render();
+}
+
+document.getElementById("filterMonth").addEventListener("change", render);
+load();
+</script>
+</body>
+</html>
