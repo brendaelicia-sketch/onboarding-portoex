@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inconsistências</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">📋 Portal de Onboarding</div>
+  <nav>
+    <a href="index.html">Início</a>
+    <a href="onboarding.html">Novo Onboarding</a>
+    <a href="relatorios.html">Relatório Mensal</a>
+    <a href="inconsistencias.html">Inconsistências</a>
+    <a href="dashboard.html">Dashboard</a>
+  </nav>
+</div>
+
+<div class="container">
+  <h1>Registro de Inconsistências</h1>
+  <p class="subtitle">Registre aqui qualquer inconsistência do sistema identificada. Qualquer pessoa do time pode incluir um registro.</p>
+
+  <div class="card">
+    <form id="form-inc">
+      <label class="required" for="data">Data</label>
+      <input type="date" id="data" name="data" required />
+
+      <label class="required" for="analista">Nome do analista</label>
+      <input type="text" id="analista" name="analista" list="analistas" required placeholder="Quem está registrando" />
+      <datalist id="analistas">
+        <option>Julia</option>
+        <option>Douglas</option>
+        <option>Gustavo</option>
+        <option>Lucas</option>
+        <option>May</option>
+        <option>Murilo</option>
+        <option>Brenda</option>
+        <option>Leticia</option>
+        <option>Duda</option>
+      </datalist>
+
+      <label class="required" for="naoConformidadeCriada">Foi criado não conformidade?</label>
+      <select id="naoConformidadeCriada" name="naoConformidadeCriada" required>
+        <option value="">Selecione</option>
+        <option>Sim</option>
+        <option>Não</option>
+      </select>
+
+      <label class="required" for="setorCausador">Setor causador</label>
+      <select id="setorCausador" name="setorCausador" required>
+        <option value="">Selecione</option>
+        <option>Operacional</option>
+        <option>Importação</option>
+        <option>Exportação</option>
+        <option>Logística</option>
+        <option>Comercial</option>
+        <option>Financeiro</option>
+        <option>Faturamento/Cobrança</option>
+        <option>Documentação</option>
+        <option>Pricing</option>
+        <option>TI/Sistemas</option>
+        <option>Atendimento ao Cliente</option>
+        <option>Outro</option>
+      </select>
+
+      <label class="required" for="oQueCausou">O que causou</label>
+      <input type="text" id="oQueCausou" name="oQueCausou" required placeholder="Resumo curto da causa" />
+
+      <label class="required" for="descricao">Descrição do ocorrido</label>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button type="button" class="record-btn" id="recordBtn">🎤 Gravar áudio e transcrever</button>
+        <span class="hint" id="recStatus"></span>
+      </div>
+      <textarea id="descricao" name="descricao" required placeholder="Descreva o que aconteceu. Você pode digitar ou usar o botão de gravação acima."></textarea>
+      <div class="hint" id="speechWarning" style="display:none;color:var(--warn);">Reconhecimento de voz não é suportado neste navegador. Use Chrome ou Edge, ou digite a descrição manualmente.</div>
+
+      <label class="required" for="atendimentoResolveu">O atendimento teve que resolver?</label>
+      <select id="atendimentoResolveu" name="atendimentoResolveu" required>
+        <option value="">Selecione</option>
+        <option>Sim</option>
+        <option>Não</option>
+      </select>
+
+      <div class="btn-row">
+        <button type="submit" class="btn" id="submitBtn">Salvar Inconsistência</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Últimas inconsistências registradas</h2>
+    <div id="list-wrap"><p class="loading">Carregando...</p></div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+document.getElementById("data").valueAsDate = new Date();
+
+// --- Gravação de áudio com transcrição automática (Web Speech API) ---
+const recordBtn = document.getElementById("recordBtn");
+const descricao = document.getElementById("descricao");
+const recStatus = document.getElementById("recStatus");
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!SpeechRecognition) {
+  document.getElementById("speechWarning").style.display = "block";
+  recordBtn.disabled = true;
+  recordBtn.title = "Não suportado neste navegador";
+} else {
+  const recognition = new SpeechRecognition();
+  recognition.lang = "pt-BR";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  let recording = false;
+  let baseText = "";
+  let finalTranscript = "";
+
+  recognition.onresult = (event) => {
+    let interim = "";
+    finalTranscript = "";
+    for (let i = 0; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalTranscript += t + " ";
+      else interim += t;
+    }
+    descricao.value = (baseText + " " + finalTranscript + interim).trim();
+  };
+
+  recognition.onerror = (event) => {
+    recStatus.textContent = "Erro no reconhecimento de voz: " + event.error;
+    stopRecording();
+  };
+
+  recognition.onend = () => {
+    if (recording) {
+      // navegador encerrou sozinho (silêncio prolongado); reinicia se ainda estiver "gravando"
+      try { recognition.start(); } catch (e) {}
+    }
+  };
+
+  function startRecording() {
+    baseText = descricao.value ? descricao.value + " " : "";
+    recording = true;
+    recordBtn.classList.add("recording");
+    recordBtn.textContent = "⏹ Parar gravação";
+    recStatus.textContent = "Gravando... fale a descrição do ocorrido.";
+    try { recognition.start(); } catch (e) {}
+  }
+
+  function stopRecording() {
+    recording = false;
+    recordBtn.classList.remove("recording");
+    recordBtn.textContent = "🎤 Gravar áudio e transcrever";
+    recStatus.textContent = "Transcrição concluída. Revise o texto antes de salvar.";
+    try { recognition.stop(); } catch (e) {}
+  }
+
+  recordBtn.addEventListener("click", () => {
+    if (!recording) startRecording();
+    else stopRecording();
+  });
+}
+
+// --- Envio do formulário ---
+document.getElementById("form-inc").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const body = {
+    data: form.data.value,
+    analista: form.analista.value,
+    naoConformidadeCriada: form.naoConformidadeCriada.value,
+    setorCausador: form.setorCausador.value,
+    oQueCausou: form.oQueCausou.value,
+    descricao: form.descricao.value,
+    atendimentoResolveu: form.atendimentoResolveu.value,
+  };
+
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "Salvando...";
+
+  try {
+    await apiPost("/api/inconsistencias", body);
+    showToast("Inconsistência registrada com sucesso!", "success");
+    form.reset();
+    document.getElementById("data").valueAsDate = new Date();
+    recStatus.textContent = "";
+    loadList();
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Salvar Inconsistência";
+  }
+});
+
+async function loadList() {
+  const wrap = document.getElementById("list-wrap");
+  try {
+    const records = await apiGet("/api/inconsistencias");
+    const recent = [...records].sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || "")).slice(0, 10);
+    if (recent.length === 0) {
+      wrap.innerHTML = '<p class="empty-state">Nenhuma inconsistência registrada ainda.</p>';
+      return;
+    }
+    let html = '<table><thead><tr><th>Data</th><th>Analista</th><th>Setor causador</th><th>Não conformidade</th><th>O que causou</th><th>Atendimento resolveu</th></tr></thead><tbody>';
+    recent.forEach((r) => {
+      html += `<tr>
+        <td>${fmtDate(r.data)}</td>
+        <td>${escapeHtml(r.analista)}</td>
+        <td>${escapeHtml(r.setorCausador)}</td>
+        <td><span class="badge ${r.naoConformidadeCriada === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.naoConformidadeCriada)}</span></td>
+        <td>${escapeHtml(r.oQueCausou)}</td>
+        <td><span class="badge ${r.atendimentoResolveu === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.atendimentoResolveu)}</span></td>
+      </tr>`;
+    });
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+  } catch (err) {
+    wrap.innerHTML = '<p class="empty-state">Não foi possível carregar os registros agora.</p>';
+  }
+}
+loadList();
+</script>
+</body>
+</html>
