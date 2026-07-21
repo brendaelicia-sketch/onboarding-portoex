@@ -10,11 +10,11 @@
 <div class="topbar">
   <div class="brand">📋 Portal de Onboarding</div>
   <nav>
-    <a href="index.html">Início</a>
-    <a href="onboarding.html">Novo Onboarding</a>
-    <a href="relatorios.html">Relatório Mensal</a>
-    <a href="inconsistencias.html">Inconsistências</a>
-    <a href="dashboard.html">Dashboard</a>
+    <a href='/'>Início</a>
+    <a href='/onboarding'>Novo Onboarding</a>
+    <a href='/relatorios'>Relatório Mensal</a>
+    <a href='/inconsistencias'>Inconsistências</a>
+    <a href='/dashboard'>Dashboard</a>
   </nav>
 </div>
 
@@ -101,8 +101,13 @@
       <input type="hidden" id="notaLigacao" name="notaLigacao" required />
 
       <label class="required" for="resumo">Resumo da conversa</label>
-      <textarea id="resumo" name="resumo" required placeholder="Contexto, decisões, pendências e próximos passos."></textarea>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button type="button" class="record-btn" id="recordBtn">🎤 Gravar áudio e transcrever</button>
+        <span class="hint" id="recStatus"></span>
+      </div>
+      <textarea id="resumo" name="resumo" required placeholder="Contexto, decisões, pendências e próximos passos. Você pode digitar ou usar o botão de gravação acima."></textarea>
       <div class="hint"><span id="charCount">0</span> / 250 caracteres mínimos</div>
+      <div class="hint" id="speechWarning" style="display:none;color:var(--warn);">Reconhecimento de voz não é suportado neste navegador. Use Chrome ou Edge, ou digite o resumo manualmente.</div>
 
       <div class="btn-row">
         <button type="submit" class="btn" id="submitBtn">Salvar Onboarding</button>
@@ -129,6 +134,71 @@ const resumo = document.getElementById("resumo");
 resumo.addEventListener("input", () => {
   document.getElementById("charCount").textContent = resumo.value.length;
 });
+
+// --- Gravação de áudio com transcrição automática (Web Speech API) ---
+const recordBtn = document.getElementById("recordBtn");
+const recStatus = document.getElementById("recStatus");
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!SpeechRecognition) {
+  document.getElementById("speechWarning").style.display = "block";
+  recordBtn.disabled = true;
+  recordBtn.title = "Não suportado neste navegador";
+} else {
+  const recognition = new SpeechRecognition();
+  recognition.lang = "pt-BR";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  let recording = false;
+  let baseText = "";
+  let finalTranscript = "";
+
+  recognition.onresult = (event) => {
+    let interim = "";
+    finalTranscript = "";
+    for (let i = 0; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalTranscript += t + " ";
+      else interim += t;
+    }
+    resumo.value = (baseText + " " + finalTranscript + interim).trim();
+    resumo.dispatchEvent(new Event("input"));
+  };
+
+  recognition.onerror = (event) => {
+    recStatus.textContent = "Erro no reconhecimento de voz: " + event.error;
+    stopRecording();
+  };
+
+  recognition.onend = () => {
+    if (recording) {
+      try { recognition.start(); } catch (e) {}
+    }
+  };
+
+  function startRecording() {
+    baseText = resumo.value ? resumo.value + " " : "";
+    recording = true;
+    recordBtn.classList.add("recording");
+    recordBtn.textContent = "⏹ Parar gravação";
+    recStatus.textContent = "Gravando... fale o resumo da conversa.";
+    try { recognition.start(); } catch (e) {}
+  }
+
+  function stopRecording() {
+    recording = false;
+    recordBtn.classList.remove("recording");
+    recordBtn.textContent = "🎤 Gravar áudio e transcrever";
+    recStatus.textContent = "Transcrição concluída. Revise o texto antes de salvar.";
+    try { recognition.stop(); } catch (e) {}
+  }
+
+  recordBtn.addEventListener("click", () => {
+    if (!recording) startRecording();
+    else stopRecording();
+  });
+}
 
 document.getElementById("form-onboarding").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -168,6 +238,7 @@ document.getElementById("form-onboarding").addEventListener("submit", async (e) 
     nota = 0;
     stars.forEach((st) => st.classList.remove("active"));
     document.getElementById("charCount").textContent = "0";
+    if (recStatus) recStatus.textContent = "";
   } catch (err) {
     showToast(err.message, "error");
   } finally {
