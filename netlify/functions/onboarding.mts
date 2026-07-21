@@ -3,7 +3,7 @@ import { getStore } from "@netlify/blobs";
 
 interface OnboardingRecord {
   id: string;
-  data: string; // YYYY-MM-DD
+  data: string;
   responsavel: string;
   empresa: string;
   classificacao: string;
@@ -22,6 +22,7 @@ function getBlobStore() {
 
 export default async (req: Request, context: Context) => {
   const store = getBlobStore();
+  const url = new URL(req.url);
 
   if (req.method === "GET") {
     const records = (await store.get("records", { type: "json" })) as OnboardingRecord[] | null;
@@ -30,9 +31,39 @@ export default async (req: Request, context: Context) => {
     });
   }
 
+  if (req.method === "POST" && url.searchParams.get("bulk") === "1") {
+    const secret = req.headers.get("x-import-secret");
+    if (secret !== "portoex-import-2026") {
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+    }
+    const body = await req.json();
+    const incoming = Array.isArray(body) ? body : [];
+    const existing = ((await store.get("records", { type: "json" })) as OnboardingRecord[] | null) || [];
+    const merged = existing.concat(
+      incoming.map((r: any) => ({
+        id: r.id || crypto.randomUUID(),
+        data: String(r.data || ""),
+        responsavel: String(r.responsavel || ""),
+        empresa: String(r.empresa || ""),
+        classificacao: String(r.classificacao || ""),
+        comQuemFalou: String(r.comQuemFalou || ""),
+        telefone: String(r.telefone || ""),
+        departamento: String(r.departamento || ""),
+        relacionamento: String(r.relacionamento || ""),
+        notaLigacao: String(r.notaLigacao || ""),
+        resumo: String(r.resumo || ""),
+        criadoEm: String(r.criadoEm || new Date().toISOString()),
+      }))
+    );
+    await store.setJSON("records", merged);
+    return new Response(JSON.stringify({ ok: true, total: merged.length, imported: incoming.length }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
   if (req.method === "POST") {
     const body = await req.json();
-
     const required = ["data", "responsavel", "empresa", "classificacao", "comQuemFalou", "departamento", "notaLigacao", "resumo"];
     for (const field of required) {
       if (!body[field] || String(body[field]).trim() === "") {
@@ -42,16 +73,13 @@ export default async (req: Request, context: Context) => {
         });
       }
     }
-
     if (String(body.resumo).trim().length < 250) {
       return new Response(JSON.stringify({ error: "O resumo da conversa precisa ter no minimo 250 caracteres." }), {
         status: 400,
         headers: { "content-type": "application/json" },
       });
     }
-
     const existing = ((await store.get("records", { type: "json" })) as OnboardingRecord[] | null) || [];
-
     const record: OnboardingRecord = {
       id: crypto.randomUUID(),
       data: String(body.data),
@@ -66,10 +94,8 @@ export default async (req: Request, context: Context) => {
       resumo: String(body.resumo),
       criadoEm: new Date().toISOString(),
     };
-
     existing.push(record);
     await store.setJSON("records", existing);
-
     return new Response(JSON.stringify(record), {
       status: 201,
       headers: { "content-type": "application/json" },
@@ -77,7 +103,6 @@ export default async (req: Request, context: Context) => {
   }
 
   if (req.method === "DELETE") {
-    const url = new URL(req.url);
     const id = url.searchParams.get("id");
     if (!id) {
       return new Response(JSON.stringify({ error: "id obrigatorio" }), { status: 400 });

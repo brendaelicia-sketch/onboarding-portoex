@@ -3,13 +3,13 @@ import { getStore } from "@netlify/blobs";
 
 interface InconsistenciaRecord {
   id: string;
-  data: string; // YYYY-MM-DD
+  data: string;
   analista: string;
-  naoConformidadeCriada: string; // "Sim" | "Nao"
+  naoConformidadeCriada: string;
   setorCausador: string;
   oQueCausou: string;
   descricao: string;
-  atendimentoResolveu: string; // "Sim" | "Nao"
+  atendimentoResolveu: string;
   criadoEm: string;
 }
 
@@ -19,6 +19,7 @@ function getBlobStore() {
 
 export default async (req: Request, context: Context) => {
   const store = getBlobStore();
+  console.log("inconsistencias fn build v2");
 
   if (req.method === "GET") {
     const records = (await store.get("records", { type: "json" })) as InconsistenciaRecord[] | null;
