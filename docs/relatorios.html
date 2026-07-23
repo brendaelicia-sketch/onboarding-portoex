@@ -117,7 +117,7 @@ function renderOnboarding() {
     tableWrap.innerHTML = '<p class="empty-state">Nenhum registro neste mês.</p>';
   } else {
     let html = '<table><thead><tr><th>Data</th><th>Responsável</th><th>Empresa</th><th>Classificação</th><th>Contato</th><th>Departamento</th><th>Relacionamento</th><th>Nota</th><th>Resumo</th></tr></thead><tbody>';
-    [...onboarding].sort((a, b) => a.data.localeCompare(b.data)).forEach((r) => {
+    [...onboarding].sort((a, b) => b.data.localeCompare(a.data)).forEach((r) => {
       html += `<tr>
         <td>${fmtDate(r.data)}</td>
         <td>${escapeHtml(r.responsavel)}</td>
@@ -150,7 +150,7 @@ function renderInc() {
     tableWrap.innerHTML = '<p class="empty-state">Nenhum registro neste mês.</p>';
   } else {
     let html = '<table><thead><tr><th>Data</th><th>Analista</th><th>Não conform.</th><th>Setor causador</th><th>O que causou</th><th>Descrição</th><th>Atendimento resolveu</th></tr></thead><tbody>';
-    [...inc].sort((a, b) => a.data.localeCompare(b.data)).forEach((r) => {
+    [...inc].sort((a, b) => b.data.localeCompare(a.data)).forEach((r) => {
       html += `<tr>
         <td>${fmtDate(r.data)}</td>
         <td>${escapeHtml(r.analista)}</td>
