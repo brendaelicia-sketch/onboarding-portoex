@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Novo Onboarding</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">📋 Portal de Onboarding</div>
+  <nav>
+    <a href='index.html'>Início</a>
+    <a href='onboarding.html'>Novo Onboarding</a>
+    <a href='relatorios.html'>Relatório Mensal</a>
+    <a href='inconsistencias.html'>Inconsistências</a>
+    <a href='dashboard.html'>Dashboard</a>
+  </nav>
+</div>
+
+<div class="container">
+  <h1>Registro de Onboarding</h1>
+  <p class="subtitle">Registro de contato com cliente. Preencha após cada ligação.</p>
+
+  <div class="card">
+    <form id="form-onboarding">
+      <label class="required" for="data">Data</label>
+      <input type="date" id="data" name="data" required />
+
+      <label class="required" for="responsavel">Responsável (quem fez o contato)</label>
+      <select id="responsavel" name="responsavel" required>
+        <option value="">Selecione</option>
+        <option>Julia</option>
+        <option>Douglas</option>
+        <option>Gustavo</option>
+        <option>Lucas</option>
+        <option>May</option>
+        <option>Murilo</option>
+        <option>Brenda</option>
+        <option>Leticia</option>
+        <option>Duda</option>
+      </select>
+
+      <label class="required" for="empresa">Empresa</label>
+      <input type="text" id="empresa" name="empresa" required />
+
+      <label class="required" for="classificacao">Classificação da conta</label>
+      <select id="classificacao" name="classificacao" required>
+        <option value="">Selecione</option>
+        <option>Top 5</option>
+        <option>Top 10</option>
+        <option>Top 20</option>
+        <option>Top 30</option>
+        <option>Cliente em crescimento</option>
+        <option>Prospecção</option>
+        <option>Cliente através da Capital Trade</option>
+      </select>
+
+      <label class="required" for="comQuemFalou">Com quem falou?</label>
+      <input type="text" id="comQuemFalou" name="comQuemFalou" required />
+
+      <label for="telefone">Telefone</label>
+      <input type="tel" id="telefone" name="telefone" />
+
+      <label class="required" for="departamento">Departamento do contato</label>
+      <select id="departamento" name="departamento" required>
+        <option value="">Selecione</option>
+        <option>Operacional</option>
+        <option>Importação</option>
+        <option>Logística</option>
+        <option>Comercial</option>
+        <option>Gerente</option>
+        <option>Coordenador</option>
+        <option>Diretor</option>
+        <option>SAC</option>
+        <option>Pricing</option>
+        <option>Supervisor Operacional</option>
+        <option>Relacionamento</option>
+      </select>
+
+      <label for="relacionamento">Relacionamento</label>
+      <select id="relacionamento" name="relacionamento">
+        <option value="">Selecione</option>
+        <option>Excelente</option>
+        <option>Muito Bom</option>
+        <option>Bom</option>
+        <option>Regular</option>
+        <option>Melhorando</option>
+        <option>Iniciamos bem</option>
+        <option>Ruim</option>
+      </select>
+
+      <label class="required">Como foi a ligação</label>
+      <div class="stars" id="stars">
+        <span class="star" data-value="1">★</span>
+        <span class="star" data-value="2">★</span>
+        <span class="star" data-value="3">★</span>
+        <span class="star" data-value="4">★</span>
+        <span class="star" data-value="5">★</span>
+      </div>
+      <input type="hidden" id="notaLigacao" name="notaLigacao" required />
+
+      <label class="required" for="resumo">Resumo da conversa</label>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button type="button" class="record-btn" id="recordBtn">🎤 Gravar áudio e transcrever</button>
+        <span class="hint" id="recStatus"></span>
+      </div>
+      <textarea id="resumo" name="resumo" required placeholder="Contexto, decisões, pendências e próximos passos. Você pode digitar ou usar o botão de gravação acima."></textarea>
+      <div class="hint"><span id="charCount">0</span> / 250 caracteres mínimos</div>
+      <div class="hint" id="speechWarning" style="display:none;color:var(--warn);">Reconhecimento de voz não é suportado neste navegador. Use Chrome ou Edge, ou digite o resumo manualmente.</div>
+
+      <div class="btn-row">
+        <button type="submit" class="btn" id="submitBtn">Salvar Onboarding</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+document.getElementById("data").valueAsDate = new Date();
+
+let nota = 0;
+const stars = document.querySelectorAll("#stars .star");
+stars.forEach((s) => {
+  s.addEventListener("click", () => {
+    nota = parseInt(s.dataset.value, 10);
+    document.getElementById("notaLigacao").value = nota;
+    stars.forEach((st) => st.classList.toggle("active", parseInt(st.dataset.value, 10) <= nota));
+  });
+});
+
+const resumo = document.getElementById("resumo");
+resumo.addEventListener("input", () => {
+  document.getElementById("charCount").textContent = resumo.value.length;
+});
+
+// --- Gravação de áudio com transcrição automática (Web Speech API) ---
+const recordBtn = document.getElementById("recordBtn");
+const recStatus = document.getElementById("recStatus");
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!SpeechRecognition) {
+  document.getElementById("speechWarning").style.display = "block";
+  recordBtn.disabled = true;
+  recordBtn.title = "Não suportado neste navegador";
+} else {
+  const recognition = new SpeechRecognition();
+  recognition.lang = "pt-BR";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  let recording = false;
+  let baseText = "";
+  let finalTranscript = "";
+
+  recognition.onresult = (event) => {
+    let interim = "";
+    finalTranscript = "";
+    for (let i = 0; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalTranscript += t + " ";
+      else interim += t;
+    }
+    resumo.value = (baseText + " " + finalTranscript + interim).trim();
+    resumo.dispatchEvent(new Event("input"));
+  };
+
+  recognition.onerror = (event) => {
+    recStatus.textContent = "Erro no reconhecimento de voz: " + event.error;
+    stopRecording();
+  };
+
+  recognition.onend = () => {
+    if (recording) {
+      try { recognition.start(); } catch (e) {}
+    }
+  };
+
+  function startRecording() {
+    baseText = resumo.value ? resumo.value + " " : "";
+    recording = true;
+    recordBtn.classList.add("recording");
+    recordBtn.textContent = "⏹ Parar gravação";
+    recStatus.textContent = "Gravando... fale o resumo da conversa.";
+    try { recognition.start(); } catch (e) {}
+  }
+
+  function stopRecording() {
+    recording = false;
+    recordBtn.classList.remove("recording");
+    recordBtn.textContent = "🎤 Gravar áudio e transcrever";
+    recStatus.textContent = "Transcrição concluída. Revise o texto antes de salvar.";
+    try { recognition.stop(); } catch (e) {}
+  }
+
+  recordBtn.addEventListener("click", () => {
+    if (!recording) startRecording();
+    else stopRecording();
+  });
+}
+
+document.getElementById("form-onboarding").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!nota) {
+    showToast("Selecione a nota da ligação (estrelas).", "error");
+    return;
+  }
+  if (resumo.value.trim().length < 250) {
+    showToast("O resumo precisa ter no mínimo 250 caracteres.", "error");
+    return;
+  }
+
+  const form = e.target;
+  const body = {
+    data: form.data.value,
+    responsavel: form.responsavel.value,
+    empresa: form.empresa.value,
+    classificacao: form.classificacao.value,
+    comQuemFalou: form.comQuemFalou.value,
+    telefone: form.telefone.value,
+    departamento: form.departamento.value,
+    relacionamento: form.relacionamento.value,
+    notaLigacao: form.notaLigacao.value,
+    resumo: form.resumo.value,
+  };
+
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "Salvando...";
+
+  try {
+    await apiPost("/api/onboarding", body);
+    showToast("Onboarding registrado com sucesso!", "success");
+    form.reset();
+    document.getElementById("data").valueAsDate = new Date();
+    nota = 0;
+    stars.forEach((st) => st.classList.remove("active"));
+    document.getElementById("charCount").textContent = "0";
+    if (recStatus) recStatus.textContent = "";
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Salvar Onboarding";
+  }
+});
+</script>
+</body>
+</html>

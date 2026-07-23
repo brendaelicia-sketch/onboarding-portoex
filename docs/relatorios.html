@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relatório Mensal</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">📋 Portal de Onboarding</div>
+  <nav>
+    <a href='index.html'>Início</a>
+    <a href='onboarding.html'>Novo Onboarding</a>
+    <a href='relatorios.html'>Relatório Mensal</a>
+    <a href='inconsistencias.html'>Inconsistências</a>
+    <a href='dashboard.html'>Dashboard</a>
+  </nav>
+</div>
+
+<div class="container">
+  <h1>Relatório Mensal</h1>
+  <p class="subtitle">Todos os registros ficam salvos automaticamente. Escolha o mês para ver o relatório de onboarding e de inconsistências.</p>
+
+  <div class="filters">
+    <div class="field">
+      <label for="filterMonth">Mês</label>
+      <input type="month" id="filterMonth" />
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="btn-row" style="justify-content: space-between; margin-bottom: 4px;">
+      <h2 style="margin:0;">Onboarding do mês</h2>
+      <button class="btn secondary" id="exportOnboarding">⬇ Exportar CSV</button>
+    </div>
+    <div class="grid cols-3" style="margin: 16px 0;">
+      <div class="card kpi">
+        <div class="value" id="ob-total">-</div>
+        <div class="label">Total de onboardings</div>
+      </div>
+      <div class="card kpi">
+        <div class="value" id="ob-empresas">-</div>
+        <div class="label">Empresas atendidas</div>
+      </div>
+      <div class="card kpi">
+        <div class="value" id="ob-media">-</div>
+        <div class="label">Nota média</div>
+      </div>
+    </div>
+    <h2>Ranking completo do mês</h2>
+    <div id="ranking-wrap"><p class="loading">Carregando...</p></div>
+    <h2 style="margin-top:24px;">Todos os registros</h2>
+    <div id="ob-table-wrap"><p class="loading">Carregando...</p></div>
+  </div>
+
+  <div class="card">
+    <div class="btn-row" style="justify-content: space-between; margin-bottom: 4px;">
+      <h2 style="margin:0;">Inconsistências do mês</h2>
+      <button class="btn secondary" id="exportInc">⬇ Exportar CSV</button>
+    </div>
+    <div class="grid cols-3" style="margin: 16px 0;">
+      <div class="card kpi">
+        <div class="value" id="inc-total">-</div>
+        <div class="label">Total de inconsistências</div>
+      </div>
+      <div class="card kpi">
+        <div class="value" id="inc-nc">-</div>
+        <div class="label">Com não conformidade</div>
+      </div>
+      <div class="card kpi">
+        <div class="value" id="inc-setor">-</div>
+        <div class="label">Setor que mais acionou</div>
+      </div>
+    </div>
+    <div id="inc-table-wrap"><p class="loading">Carregando...</p></div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+let onboardingAll = [], incAll = [];
+
+function currentFiltered() {
+  const monthValue = document.getElementById("filterMonth").value || currentMonthValue();
+  return {
+    monthValue,
+    onboarding: onboardingAll.filter((r) => isInMonth(r.data, monthValue)),
+    inc: incAll.filter((r) => isInMonth(r.data, monthValue)),
+  };
+}
+
+function renderOnboarding() {
+  const { onboarding } = currentFiltered();
+  document.getElementById("ob-total").textContent = onboarding.length;
+  document.getElementById("ob-empresas").textContent = new Set(onboarding.map((r) => r.empresa.trim().toLowerCase())).size;
+  const notas = onboarding.map((r) => parseFloat(r.notaLigacao)).filter((n) => !isNaN(n));
+  document.getElementById("ob-media").textContent = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1) + " ⭐" : "-";
+
+  const counts = {};
+  onboarding.forEach((r) => { counts[r.responsavel] = (counts[r.responsavel] || 0) + 1; });
+  const ranking = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const rankingWrap = document.getElementById("ranking-wrap");
+  if (ranking.length === 0) {
+    rankingWrap.innerHTML = '<p class="empty-state">Sem registros neste mês.</p>';
+  } else {
+    let html = '<table><thead><tr><th>#</th><th>Responsável</th><th>Onboardings</th></tr></thead><tbody>';
+    ranking.forEach(([name, count], i) => {
+      html += `<tr><td>${i + 1}º</td><td>${escapeHtml(name)}</td><td>${count}</td></tr>`;
+    });
+    html += "</tbody></table>";
+    rankingWrap.innerHTML = html;
+  }
+
+  const tableWrap = document.getElementById("ob-table-wrap");
+  if (onboarding.length === 0) {
+    tableWrap.innerHTML = '<p class="empty-state">Nenhum registro neste mês.</p>';
+  } else {
+    let html = '<table><thead><tr><th>Data</th><th>Responsável</th><th>Empresa</th><th>Classificação</th><th>Contato</th><th>Departamento</th><th>Relacionamento</th><th>Nota</th><th>Resumo</th></tr></thead><tbody>';
+    [...onboarding].sort((a, b) => a.data.localeCompare(b.data)).forEach((r) => {
+      html += `<tr>
+        <td>${fmtDate(r.data)}</td>
+        <td>${escapeHtml(r.responsavel)}</td>
+        <td>${escapeHtml(r.empresa)}</td>
+        <td>${escapeHtml(r.classificacao)}</td>
+        <td>${escapeHtml(r.comQuemFalou)}</td>
+        <td>${escapeHtml(r.departamento)}</td>
+        <td>${escapeHtml(r.relacionamento)}</td>
+        <td>${escapeHtml(r.notaLigacao)} ⭐</td>
+        <td style="max-width:280px;">${escapeHtml(r.resumo)}</td>
+      </tr>`;
+    });
+    html += "</tbody></table>";
+    tableWrap.innerHTML = html;
+  }
+}
+
+function renderInc() {
+  const { inc } = currentFiltered();
+  document.getElementById("inc-total").textContent = inc.length;
+  document.getElementById("inc-nc").textContent = inc.filter((r) => r.naoConformidadeCriada === "Sim").length;
+
+  const bySetor = {};
+  inc.forEach((r) => { bySetor[r.setorCausador] = (bySetor[r.setorCausador] || 0) + 1; });
+  const top = Object.entries(bySetor).sort((a, b) => b[1] - a[1])[0];
+  document.getElementById("inc-setor").textContent = top ? top[0] : "-";
+
+  const tableWrap = document.getElementById("inc-table-wrap");
+  if (inc.length === 0) {
+    tableWrap.innerHTML = '<p class="empty-state">Nenhum registro neste mês.</p>';
+  } else {
+    let html = '<table><thead><tr><th>Data</th><th>Analista</th><th>Não conform.</th><th>Setor causador</th><th>O que causou</th><th>Descrição</th><th>Atendimento resolveu</th></tr></thead><tbody>';
+    [...inc].sort((a, b) => a.data.localeCompare(b.data)).forEach((r) => {
+      html += `<tr>
+        <td>${fmtDate(r.data)}</td>
+        <td>${escapeHtml(r.analista)}</td>
+        <td><span class="badge ${r.naoConformidadeCriada === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.naoConformidadeCriada)}</span></td>
+        <td>${escapeHtml(r.setorCausador)}</td>
+        <td>${escapeHtml(r.oQueCausou)}</td>
+        <td style="max-width:280px;">${escapeHtml(r.descricao)}</td>
+        <td><span class="badge ${r.atendimentoResolveu === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.atendimentoResolveu)}</span></td>
+      </tr>`;
+    });
+    html += "</tbody></table>";
+    tableWrap.innerHTML = html;
+  }
+}
+
+document.getElementById("exportOnboarding").addEventListener("click", () => {
+  const { onboarding, monthValue } = currentFiltered();
+  const rows = [["Data","Responsável","Empresa","Classificação","Com quem falou","Telefone","Departamento","Relacionamento","Nota","Resumo"]];
+  onboarding.forEach((r) => rows.push([fmtDate(r.data), r.responsavel, r.empresa, r.classificacao, r.comQuemFalou, r.telefone, r.departamento, r.relacionamento, r.notaLigacao, r.resumo]));
+  downloadCsv(`onboarding-${monthValue}.csv`, rows);
+});
+
+document.getElementById("exportInc").addEventListener("click", () => {
+  const { inc, monthValue } = currentFiltered();
+  const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu"]];
+  inc.forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu]));
+  downloadCsv(`inconsistencias-${monthValue}.csv`, rows);
+});
+
+document.getElementById("filterMonth").addEventListener("change", () => { renderOnboarding(); renderInc(); });
+
+async function load() {
+  document.getElementById("filterMonth").value = currentMonthValue();
+  try {
+    [onboardingAll, incAll] = await Promise.all([apiGet("/api/onboarding"), apiGet("/api/inconsistencias")]);
+  } catch (e) {
+    showToast(e.message, "error");
+    onboardingAll = []; incAll = [];
+  }
+  renderOnboarding();
+  renderInc();
+}
+load();
+</script>
+</body>
+</html>
