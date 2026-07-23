@@ -1,9 +1,0 @@
-{
-  "name": "onboarding-portoex",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Portal de padronizacao de onboarding e inconsistencias",
-  "dependencies": {
-    "@netlify/blobs": "^8.1.0"
-  }
-}
