@@ -32,7 +32,10 @@
   <div class="card">
     <div class="btn-row" style="justify-content: space-between; margin-bottom: 4px;">
       <h2 style="margin:0;">Onboarding do mês</h2>
-      <button class="btn secondary" id="exportOnboarding">⬇ Exportar CSV</button>
+      <div class="btn-row" style="gap:8px;">
+        <button class="btn secondary" id="exportOnboarding">⬇ Exportar mês</button>
+        <button class="btn secondary" id="exportOnboardingAll">⬇ Exportar tudo</button>
+      </div>
     </div>
     <div class="grid cols-3" style="margin: 16px 0;">
       <div class="card kpi">
@@ -57,7 +60,10 @@
   <div class="card">
     <div class="btn-row" style="justify-content: space-between; margin-bottom: 4px;">
       <h2 style="margin:0;">Inconsistências do mês</h2>
-      <button class="btn secondary" id="exportInc">⬇ Exportar CSV</button>
+      <div class="btn-row" style="gap:8px;">
+        <button class="btn secondary" id="exportInc">⬇ Exportar mês</button>
+        <button class="btn secondary" id="exportIncAll">⬇ Exportar tudo</button>
+      </div>
     </div>
     <div class="grid cols-3" style="margin: 16px 0;">
       <div class="card kpi">
@@ -178,6 +184,18 @@ document.getElementById("exportInc").addEventListener("click", () => {
   const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu"]];
   inc.forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu]));
   downloadCsv(`inconsistencias-${monthValue}.csv`, rows);
+});
+
+document.getElementById("exportOnboardingAll").addEventListener("click", () => {
+  const rows = [["Data","Responsável","Empresa","Classificação","Com quem falou","Telefone","Departamento","Relacionamento","Nota","Resumo"]];
+  [...onboardingAll].sort((a, b) => b.data.localeCompare(a.data)).forEach((r) => rows.push([fmtDate(r.data), r.responsavel, r.empresa, r.classificacao, r.comQuemFalou, r.telefone, r.departamento, r.relacionamento, r.notaLigacao, r.resumo]));
+  downloadCsv(`onboarding-completo.csv`, rows);
+});
+
+document.getElementById("exportIncAll").addEventListener("click", () => {
+  const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu"]];
+  [...incAll].sort((a, b) => b.data.localeCompare(a.data)).forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu]));
+  downloadCsv(`inconsistencias-completo.csv`, rows);
 });
 
 document.getElementById("filterMonth").addEventListener("change", () => { renderOnboarding(); renderInc(); });
