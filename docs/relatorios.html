@@ -155,7 +155,7 @@ function renderInc() {
   if (inc.length === 0) {
     tableWrap.innerHTML = '<p class="empty-state">Nenhum registro neste mês.</p>';
   } else {
-    let html = '<table><thead><tr><th>Data</th><th>Analista</th><th>Não conform.</th><th>Setor causador</th><th>O que causou</th><th>Descrição</th><th>Atendimento resolveu</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Data</th><th>Analista</th><th>Não conform.</th><th>Setor causador</th><th>O que causou</th><th>Descrição</th><th>Atendimento resolveu</th><th>Setor auxiliou</th></tr></thead><tbody>';
     [...inc].sort((a, b) => b.data.localeCompare(a.data)).forEach((r) => {
       html += `<tr>
         <td>${fmtDate(r.data)}</td>
@@ -165,6 +165,7 @@ function renderInc() {
         <td>${escapeHtml(r.oQueCausou)}</td>
         <td style="max-width:280px;">${escapeHtml(r.descricao)}</td>
         <td><span class="badge ${r.atendimentoResolveu === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.atendimentoResolveu)}</span></td>
+        <td>${r.setorAuxiliou ? escapeHtml(r.setorAuxiliou) : '-'}</td>
       </tr>`;
     });
     html += "</tbody></table>";
@@ -181,8 +182,8 @@ document.getElementById("exportOnboarding").addEventListener("click", () => {
 
 document.getElementById("exportInc").addEventListener("click", () => {
   const { inc, monthValue } = currentFiltered();
-  const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu"]];
-  inc.forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu]));
+  const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu","Setor de pendência auxiliou"]];
+  inc.forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu, r.setorAuxiliou || ""]));
   downloadCsv(`inconsistencias-${monthValue}.csv`, rows);
 });
 
@@ -193,8 +194,8 @@ document.getElementById("exportOnboardingAll").addEventListener("click", () => {
 });
 
 document.getElementById("exportIncAll").addEventListener("click", () => {
-  const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu"]];
-  [...incAll].sort((a, b) => b.data.localeCompare(a.data)).forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu]));
+  const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu","Setor de pendência auxiliou"]];
+  [...incAll].sort((a, b) => b.data.localeCompare(a.data)).forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu, r.setorAuxiliou || ""]));
   downloadCsv(`inconsistencias-completo.csv`, rows);
 });
 

@@ -85,10 +85,29 @@
         <option>Não</option>
       </select>
 
+      <label class="required" for="setorAuxiliou">O setor de pendência auxiliou?</label>
+      <select id="setorAuxiliou" name="setorAuxiliou" required>
+        <option value="">Selecione</option>
+        <option>Sim</option>
+        <option>Não</option>
+      </select>
+
       <div class="btn-row">
         <button type="submit" class="btn" id="submitBtn">Salvar Inconsistência</button>
       </div>
     </form>
+  </div>
+
+  <div class="card">
+    <div class="btn-row" style="justify-content: space-between; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="margin:0 0 6px;">Relatório mensal de inconsistências</h2>
+        <label for="repMonth" style="margin:0;">Mês</label>
+        <input type="month" id="repMonth" style="width:auto;" />
+      </div>
+      <button class="btn secondary" id="exportRepInc">⬇ Baixar relatório do mês</button>
+    </div>
+    <div id="rep-wrap"><p class="loading">Carregando...</p></div>
   </div>
 
   <div class="card">
@@ -179,6 +198,7 @@ document.getElementById("form-inc").addEventListener("submit", async (e) => {
     oQueCausou: form.oQueCausou.value,
     descricao: form.descricao.value,
     atendimentoResolveu: form.atendimentoResolveu.value,
+    setorAuxiliou: form.setorAuxiliou.value,
   };
 
   const btn = document.getElementById("submitBtn");
@@ -200,32 +220,70 @@ document.getElementById("form-inc").addEventListener("submit", async (e) => {
   }
 });
 
+let allInc = [];
+
 async function loadList() {
   const wrap = document.getElementById("list-wrap");
+  const repWrap = document.getElementById("rep-wrap");
   try {
-    const records = await apiGet("/api/inconsistencias");
-    const recent = [...records].sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || "")).slice(0, 10);
+    allInc = await apiGet("/api/inconsistencias");
+    const recent = [...allInc].sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || "")).slice(0, 10);
     if (recent.length === 0) {
       wrap.innerHTML = '<p class="empty-state">Nenhuma inconsistência registrada ainda.</p>';
-      return;
+    } else {
+      wrap.innerHTML = buildTable(recent);
     }
-    let html = '<table><thead><tr><th>Data</th><th>Analista</th><th>Setor causador</th><th>Não conformidade</th><th>O que causou</th><th>Atendimento resolveu</th></tr></thead><tbody>';
-    recent.forEach((r) => {
-      html += `<tr>
-        <td>${fmtDate(r.data)}</td>
-        <td>${escapeHtml(r.analista)}</td>
-        <td>${escapeHtml(r.setorCausador)}</td>
-        <td><span class="badge ${r.naoConformidadeCriada === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.naoConformidadeCriada)}</span></td>
-        <td>${escapeHtml(r.oQueCausou)}</td>
-        <td><span class="badge ${r.atendimentoResolveu === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.atendimentoResolveu)}</span></td>
-      </tr>`;
-    });
-    html += "</tbody></table>";
-    wrap.innerHTML = html;
+    renderReport();
   } catch (err) {
     wrap.innerHTML = '<p class="empty-state">Não foi possível carregar os registros agora.</p>';
+    repWrap.innerHTML = '<p class="empty-state">Não foi possível carregar os registros agora.</p>';
   }
 }
+
+function buildTable(list) {
+  let html = '<table><thead><tr><th>Data</th><th>Analista</th><th>Setor causador</th><th>Não conformidade</th><th>O que causou</th><th>Atendimento resolveu</th><th>Setor auxiliou</th></tr></thead><tbody>';
+  list.forEach((r) => {
+    html += `<tr>
+      <td>${fmtDate(r.data)}</td>
+      <td>${escapeHtml(r.analista)}</td>
+      <td>${escapeHtml(r.setorCausador)}</td>
+      <td><span class="badge ${r.naoConformidadeCriada === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.naoConformidadeCriada)}</span></td>
+      <td>${escapeHtml(r.oQueCausou)}</td>
+      <td><span class="badge ${r.atendimentoResolveu === 'Sim' ? 'yes' : 'no'}">${escapeHtml(r.atendimentoResolveu)}</span></td>
+      <td>${r.setorAuxiliou ? `<span class="badge ${r.setorAuxiliou === 'Sim' ? 'no' : 'yes'}">${escapeHtml(r.setorAuxiliou)}</span>` : '-'}</td>
+    </tr>`;
+  });
+  html += "</tbody></table>";
+  return html;
+}
+
+function monthInc(monthValue) {
+  return [...allInc].filter((r) => isInMonth(r.data, monthValue)).sort((a, b) => b.data.localeCompare(a.data));
+}
+
+function renderReport() {
+  const repWrap = document.getElementById("rep-wrap");
+  const monthValue = document.getElementById("repMonth").value || currentMonthValue();
+  const list = monthInc(monthValue);
+  if (list.length === 0) {
+    repWrap.innerHTML = '<p class="empty-state">Nenhuma inconsistência registrada em ' + monthLabel(monthValue) + '.</p>';
+    return;
+  }
+  repWrap.innerHTML = `<p class="hint" style="margin-bottom:10px;">${list.length} registro(s) em ${monthLabel(monthValue)}.</p>` + buildTable(list);
+}
+
+document.getElementById("repMonth").value = currentMonthValue();
+document.getElementById("repMonth").addEventListener("change", renderReport);
+
+document.getElementById("exportRepInc").addEventListener("click", () => {
+  const monthValue = document.getElementById("repMonth").value || currentMonthValue();
+  const list = monthInc(monthValue);
+  if (list.length === 0) { showToast("Nenhuma inconsistência neste mês para exportar.", "error"); return; }
+  const rows = [["Data","Analista","Não conformidade criada","Setor causador","O que causou","Descrição","Atendimento resolveu","Setor de pendência auxiliou"]];
+  list.forEach((r) => rows.push([fmtDate(r.data), r.analista, r.naoConformidadeCriada, r.setorCausador, r.oQueCausou, r.descricao, r.atendimentoResolveu, r.setorAuxiliou || ""]));
+  downloadCsv(`inconsistencias-${monthValue}.csv`, rows);
+});
+
 loadList();
 </script>
 </body>
